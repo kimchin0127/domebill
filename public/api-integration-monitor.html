@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>邦捷 FonTicket - 外部系統 API 介接與日誌監控看板 (API Integration Monitor)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans TC"', 'Inter', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f8fafc',
+              800: '#1e293b',
+              900: '#0f172a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* 自訂捲軸樣式 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    /* 動畫效果 */
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen antialiased flex flex-col selection:bg-indigo-600 selection:text-white">
+
+  <!-- 頂部系統導航條 -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
+    <div class="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-4">
+        <!-- Logo 標籤 -->
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold font-mono text-xl shadow-inner border border-indigo-400/40">
+            F
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-base font-bold tracking-tight text-white">邦捷 FonTicket</span>
+              <span class="bg-indigo-900/80 text-indigo-200 border border-indigo-700/60 text-xs px-2 py-0.5 rounded font-mono font-medium">中台帳務交易核心</span>
+            </div>
+            <div class="text-xs text-slate-400">外部系統 API 介接與責任歸屬日誌監控看板 (API Integration Monitor)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-5 text-sm">
+        <div class="hidden md:flex items-center gap-2 text-xs text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-md border border-slate-700">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Gateway Health: <strong class="text-emerald-400 font-mono">NORMAL 99.98%</strong></span>
+          <span class="text-slate-500">|</span>
+          <span>連線環境: <strong class="text-slate-200 font-mono">遠雄巨蛋專網 PROD-NODE-01</strong></span>
+        </div>
+
+        <div class="flex items-center gap-2 border-l border-slate-800 pl-4">
+          <span class="text-xs text-slate-400">系統維運經辦：</span>
+          <span class="text-xs font-semibold text-white bg-slate-800 px-2.5 py-1 rounded border border-slate-700">邦捷專案架構小組</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容容器 -->
+  <main class="flex-1 max-w-[1720px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- 頁面引言與責任釐清公告 -->
+    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-xl p-5 shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shield-check" class="w-5 h-5 text-emerald-400"></i>
+          <h2 class="text-lg font-bold">雙向傳輸軌跡稽核與責任歸屬存證中心</h2>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed max-w-4xl">
+          本看板完整記錄中台對外與 <span class="text-indigo-300 font-semibold">Oracle JDE ERP (Pull)</span> 及 <span class="text-amber-300 font-semibold">遠雄公司財務系統 (Push)</span> 之一切端點通訊。包含完整毫秒時間戳記、Payload 大小、HTTP 狀態碼及原始 JSON 封包，作為系統異常時一翻兩瞪眼的責任歸屬仲裁依據。
+        </p>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <button id="btn-refresh" class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="refresh-icon"></i>
+          <span>即時重整 (Refresh)</span>
+        </button>
+        <button id="btn-export-log" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>一鍵匯出 Audit Log (CSV)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 1. 頂部 KPI 狀態數據卡片 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Card 1: 總 API 呼叫次數 -->
+      <div class="bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">今日 API 總呼叫量</span>
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-2xl font-bold font-mono text-slate-900" id="kpi-total-calls">1,428</span>
+          <span class="text-xs font-semibold text-emerald-600 flex items-center">
+            <i data-lucide="trending-up" class="w-3 h-3 mr-0.5"></i> +12.4%
+          </span>
+        </div>
+        <div class="mt-2 text-xs text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2 font-mono">
+          <span>平均回應延遲 (Avg Latency):</span>
+          <strong class="text-slate-700">145 ms</strong>
+        </div>
+      </div>
+
+      <!-- Card 2: Oracle JDE ERP 狀態 -->
+      <div class="bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Oracle JDE ERP</span>
+            <span class="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">PULL 模式</span>
+          </div>
+          <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <i data-lucide="database" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-2xl font-bold font-mono text-indigo-700" id="kpi-jde-success">99.2%</span>
+          <span class="text-xs text-slate-500">Pull 成功率</span>
+        </div>
+        <div class="mt-2 text-xs text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2 font-mono">
+          <span>最後拉取時間:</span>
+          <strong class="text-slate-700" id="kpi-jde-last-time">10 秒前</strong>
+        </div>
+      </div>
+
+      <!-- Card 3: 遠雄財務系統狀態 -->
+      <div class="bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">遠雄公司財務系統</span>
+            <span class="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-mono font-bold">PUSH 模式</span>
+          </div>
+          <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+            <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-2xl font-bold font-mono text-slate-900" id="kpi-farglory-success">98.5%</span>
+          <span class="text-xs text-slate-500">拋轉成功率</span>
+        </div>
+        <div class="mt-2 text-xs text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2 font-mono">
+          <span>異常重試佇列 (Retry Queue):</span>
+          <strong class="text-amber-600 font-bold" id="kpi-retry-queue">1 筆排程中</strong>
+        </div>
+      </div>
+
+      <!-- Card 4: 異常警示待處理 -->
+      <div class="bg-white rounded-xl p-5 border border-red-200 shadow-xs hover:shadow-md transition-shadow relative overflow-hidden bg-gradient-to-br from-white to-red-50/40">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-red-700 uppercase tracking-wider flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+            異常警示與責任待查
+          </span>
+          <div class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+            <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-2xl font-bold font-mono text-red-600" id="kpi-failed-count">2 筆</span>
+          <span class="text-xs text-red-600 font-medium">HTTP 500 / 504 異常</span>
+        </div>
+        <div class="mt-2 text-xs text-slate-600 flex items-center justify-between border-t border-red-100 pt-2">
+          <span>對方程組故障鑑定:</span>
+          <strong class="text-red-700 font-bold">已存證待釐清</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 多維度篩選與搜尋工具列 -->
+    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
+      <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        
+        <!-- 左側篩選器組合 -->
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- 系統來源篩選 -->
+          <div class="flex items-center gap-2">
+            <label for="filter-system" class="text-xs font-bold text-slate-700 whitespace-nowrap">系統來源：</label>
+            <select id="filter-system" class="text-sm bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+              <option value="ALL">全部外部系統 (All Systems)</option>
+              <option value="JDE">Oracle JDE ERP (Pull)</option>
+              <option value="FARGLORY">遠雄公司財務系統 (Push)</option>
+            </select>
+          </div>
+
+          <!-- 狀態代碼篩選 -->
+          <div class="flex items-center gap-2">
+            <label for="filter-status" class="text-xs font-bold text-slate-700 whitespace-nowrap">通訊狀態：</label>
+            <select id="filter-status" class="text-sm bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+              <option value="ALL">全部狀態 (All Status)</option>
+              <option value="SUCCESS">成功 (200 OK)</option>
+              <option value="FAILED">失敗/異常 (500/504/Timeout)</option>
+              <option value="BAD_REQUEST">參數錯誤 (400 Bad Request)</option>
+              <option value="PENDING">等待確認 (Pending ACK)</option>
+            </select>
+          </div>
+
+          <!-- 快速重設過濾 -->
+          <button id="btn-reset-filters" class="text-xs text-slate-500 hover:text-slate-800 underline px-2 py-1 transition cursor-pointer">
+            清空條件
+          </button>
+        </div>
+
+        <!-- 右側關鍵字搜尋框 -->
+        <div class="flex items-center gap-2 w-full lg:w-96">
+          <div class="relative w-full">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input 
+              type="text" 
+              id="search-input" 
+              placeholder="搜尋 Endpoint、訂單號或 Batch ID..." 
+              class="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition font-mono"
+            >
+            <button id="btn-clear-search" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <i data-lucide="x-circle" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 當前過濾結果統計標籤 -->
+      <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+        <div>
+          <span>目前顯示篩選記錄：</span>
+          <strong class="text-slate-900 font-mono font-bold" id="filtered-count">0</strong> 筆
+          <span class="text-slate-400 mx-1">/</span>
+          <span>總記錄數：</span>
+          <span class="font-mono text-slate-600" id="total-count">0</span> 筆
+        </div>
+        <div class="flex items-center gap-4 text-[11px]">
+          <span class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> 200 OK (中台正常應答/拋轉)
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> 400 Bad Request (外部參數有誤)
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> 500/504 (對方程組伺服器斷線)
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. API 存取與拋轉日誌數據表格 -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse" id="log-table">
+          <thead>
+            <tr class="bg-slate-100/90 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+              <th class="py-3.5 px-4 whitespace-nowrap">呼叫時間戳記 (毫秒)</th>
+              <th class="py-3.5 px-4 whitespace-nowrap">對接系統與方向</th>
+              <th class="py-3.5 px-4 whitespace-nowrap">介接端點 (Endpoint & Method)</th>
+              <th class="py-3.5 px-3 whitespace-nowrap text-right">筆數 / 大小</th>
+              <th class="py-3.5 px-3 whitespace-nowrap text-right">回應延遲</th>
+              <th class="py-3.5 px-3 whitespace-nowrap text-center">HTTP 狀態</th>
+              <th class="py-3.5 px-4 whitespace-nowrap">責任歸屬存證分析</th>
+              <th class="py-3.5 px-4 whitespace-nowrap text-center">操作動作</th>
+            </tr>
+          </thead>
+          <tbody id="log-table-body" class="divide-y divide-slate-100 text-xs text-slate-700 font-mono">
+            <!-- 由 JavaScript 動態生成渲染 -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 無資料空狀態 -->
+      <div id="empty-state" class="hidden py-16 text-center text-slate-400 space-y-3">
+        <i data-lucide="inbox" class="w-10 h-10 mx-auto text-slate-300"></i>
+        <div class="text-sm font-medium text-slate-600">查無符合目前篩選條件之 API 傳輸紀錄</div>
+        <p class="text-xs text-slate-400">請嘗試更換系統來源、放寬通訊狀態或清除搜尋關鍵字。</p>
+      </div>
+
+      <!-- 表格頁尾資訊 -->
+      <div class="bg-slate-50 px-4 py-3 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="info" class="w-4 h-4 text-slate-400"></i>
+          <span>責任釐清指引：500 Internal Error 與 504 Gateway Timeout 均檢附對端伺服器回應報文，點擊「檢視 Payload」即可存證。</span>
+        </div>
+        <div class="text-slate-400 font-mono text-[11px]">
+          Audit Log Retention: 180 Days (遵循 SI 合約存證標準)
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 4. 互動式彈窗 (Log Detail Modal) -->
+  <div id="log-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs hidden transition-opacity">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <i data-lucide="file-code" class="w-4 h-4 text-white"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-white flex items-center gap-2">
+              <span id="modal-title-system">API 封包詳情</span>
+              <span id="modal-badge-status" class="text-xs font-mono px-2 py-0.5 rounded font-bold">200 OK</span>
+            </h3>
+            <p class="text-xs text-slate-400 font-mono" id="modal-subtitle-endpoint">POST /external/finance/daily-settlement</p>
+          </div>
+        </div>
+        <button id="modal-btn-close" class="text-slate-400 hover:text-white p-1 rounded-md transition-colors cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+        
+        <!-- 傳輸中繼資訊摘要卡片 -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200 font-mono">
+          <div>
+            <span class="text-slate-400 block text-[10px]">呼叫時間戳記</span>
+            <strong class="text-slate-800" id="modal-info-timestamp">-</strong>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">對接傳輸模式</span>
+            <strong class="text-indigo-600 font-sans" id="modal-info-mode">-</strong>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">回應延遲時間</span>
+            <strong class="text-slate-800" id="modal-info-latency">-</strong>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">關聯 Trace / Batch ID</span>
+            <strong class="text-slate-800 break-all" id="modal-info-trace-id">-</strong>
+          </div>
+        </div>
+
+        <!-- 責任歸屬鑑定條 -->
+        <div id="modal-responsibility-box" class="p-3 rounded-lg border flex items-start gap-2.5 text-xs font-sans">
+          <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 mt-0.5 text-indigo-600" id="modal-resp-icon"></i>
+          <div>
+            <span class="font-bold text-slate-800">系統責任歸屬存證鑑定：</span>
+            <span id="modal-responsibility-text" class="text-slate-600">正常通訊</span>
+          </div>
+        </div>
+
+        <!-- Request Headers & Payload -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800 flex items-center gap-1.5 font-sans">
+              <i data-lucide="arrow-up" class="w-3.5 h-3.5 text-indigo-600"></i>
+              HTTP Request (Header & Body)
+            </span>
+            <button class="btn-copy-code text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 cursor-pointer font-sans" data-target="modal-req-json">
+              <i data-lucide="copy" class="w-3 h-3"></i> 複製 Request JSON
+            </button>
+          </div>
+          <div class="bg-slate-900 text-slate-200 rounded-lg p-3.5 font-mono text-[11px] overflow-x-auto max-h-56 leading-relaxed border border-slate-800 shadow-inner">
+            <pre id="modal-req-json">// 讀取中...</pre>
+          </div>
+        </div>
+
+        <!-- Response Headers & Payload -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800 flex items-center gap-1.5 font-sans">
+              <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-emerald-600"></i>
+              HTTP Response Body
+            </span>
+            <button class="btn-copy-code text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 cursor-pointer font-sans" data-target="modal-res-json">
+              <i data-lucide="copy" class="w-3 h-3"></i> 複製 Response JSON
+            </button>
+          </div>
+          <div class="bg-slate-900 text-slate-200 rounded-lg p-3.5 font-mono text-[11px] overflow-x-auto max-h-56 leading-relaxed border border-slate-800 shadow-inner">
+            <pre id="modal-res-json">// 讀取中...</pre>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <div class="text-[11px] text-slate-500 font-sans">
+          此證據資料已存於邦捷中台不可竄改資料庫，備份雜湊值 SHA256 可供法務及稽核對照。
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="modal-btn-copy-all" class="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            複製完整 Log 摘要
+          </button>
+          <button id="modal-btn-close-footer" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-medium transition cursor-pointer">
+            關閉視窗
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 懸浮通知系統容器 -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- 擬真資料庫與前端邏輯引擎 -->
+  <script>
+    /**
+     * 擬真 API 存取與拋轉日誌數據集 (Mock Data)
+     * 精心設計覆蓋：JDE 200/400/504，遠雄財務 200/500/Pending ACK
+     */
+    const INITIAL_LOG_DATA = [
+      {
+        id: "LOG-20261027-001",
+        timestamp: "2026-10-27 10:48:12.384",
+        system: "FARGLORY",
+        systemName: "遠雄財務系統",
+        direction: "PUSH",
+        directionLabel: "單向拋轉 Push",
+        endpoint: "/external/finance/daily-settlement",
+        method: "POST",
+        batchId: "BATCH-DOME-20261026-N01",
+        recordCount: 1420,
+        payloadSize: "148.5 KB",
+        latency: 1840,
+        status: 500,
+        statusText: "Connection Refused / Internal Error",
+        responsibility: "【遠雄端責任】遠雄財務端 API 閘道中斷未即時回應，中台已保留本機封包並排入重試佇列。",
+        respType: "THEIR_FAULT",
+        canRetry: true,
+        requestHeader: {
+          "Host": "finance-api.farglory.com.tw",
+          "Content-Type": "application/json",
+          "Authorization": "Bearer farglory_token_sec_99401",
+          "X-Correlation-ID": "CORR-20261027-001"
+        },
+        requestBody: {
+          "settlementDate": "2026-10-26",
+          "facilityId": "DOME-MUSEUM-01",
+          "totalOrders": 1420,
+          "grossAmount": 846200,
+          "netAmount": 842700,
+          "refundAmount": 3500,
+          "paymentSummary": {
+            "creditCard": 520000,
+            "easyCard": 182700,
+            "twqr": 95000,
+            "cash": 45000
+          }
+        },
+        responseBody: {
+          "timestamp": "2026-10-27T10:48:14.224Z",
+          "status": 500,
+          "error": "Internal Server Error",
+          "message": "JDBC Connection Pool exhausted; backend Oracle DB at 192.168.10.22 is unresponsive",
+          "path": "/external/finance/daily-settlement"
+        }
+      },
+      {
+        id: "LOG-20261027-002",
+        timestamp: "2026-10-27 10:45:00.112",
+        system: "JDE",
+        systemName: "Oracle JDE ERP",
+        direction: "PULL",
+        directionLabel: "單向拉取 Pull",
+        endpoint: "/api/v1/jde/transactions",
+        method: "GET",
+        batchId: "JDE-SYNC-REQ-88912",
+        recordCount: 45,
+        payloadSize: "28.4 KB",
+        latency: 118,
+        status: 200,
+        statusText: "OK",
+        responsibility: "【中台正常】JDE 排程拉取前小時票務交易明細，中台於 118ms 內高速完成加密回應。",
+        respType: "SUCCESS",
+        canRetry: false,
+        requestHeader: {
+          "Host": "middleware.fonticket.com",
+          "Accept": "application/json",
+          "X-JDE-AuthKey": "jde_museum_app_token_902",
+          "User-Agent": "Oracle-JDE-Connector/9.2"
+        },
+        requestBody: {
+          "query": "GET /api/v1/jde/transactions?startTime=2026-10-27T09:00:00Z&endTime=2026-10-27T10:00:00Z"
+        },
+        responseBody: {
+          "code": 200,
+          "status": "SUCCESS",
+          "totalCount": 45,
+          "batchWindow": "2026-10-27 09:00 ~ 10:00",
+          "dataSample": [
+            { "orderNo": "MZ261027001", "ticketType": "全票", "amount": 350, "channel": "KIOSK-01" },
+            { "orderNo": "MZ261027002", "ticketType": "優待票", "amount": 250, "channel": "POS-02" }
+          ]
+        }
+      },
+      {
+        id: "LOG-20261027-003",
+        timestamp: "2026-10-27 10:41:22.905",
+        system: "JDE",
+        systemName: "Oracle JDE ERP",
+        direction: "PULL",
+        directionLabel: "單向拉取 Pull",
+        endpoint: "/api/v1/jde/products",
+        method: "GET",
+        batchId: "JDE-SYNC-INVALID-DATE",
+        recordCount: 0,
+        payloadSize: "0.8 KB",
+        latency: 45,
+        status: 400,
+        statusText: "Bad Request",
+        responsibility: "【JDE 端責任】JDE 呼叫端帶入之日期格式錯誤（傳入 '27/10/2026'，非規範之 ISO8601 YYYY-MM-DD）。",
+        respType: "THEIR_FAULT",
+        canRetry: false,
+        requestHeader: {
+          "Host": "middleware.fonticket.com",
+          "X-JDE-AuthKey": "jde_museum_app_token_902",
+          "Query-Param": "lastUpdated=27/10/2026"
+        },
+        requestBody: {
+          "rawQuery": "GET /api/v1/jde/products?lastUpdated=27/10/2026"
+        },
+        responseBody: {
+          "code": 400,
+          "errorCode": "ERR_INVALID_DATE_FORMAT",
+          "errorMessage": "Parameter 'lastUpdated' must conform to standard ISO-8601 (YYYY-MM-DDThh:mm:ssZ). Received: '27/10/2026'",
+          "timestamp": "2026-10-27T10:41:22.950Z"
+        }
+      },
+      {
+        id: "LOG-20261027-004",
+        timestamp: "2026-10-27 10:30:15.650",
+        system: "FARGLORY",
+        systemName: "遠雄財務系統",
+        direction: "PUSH",
+        directionLabel: "單向拋轉 Push",
+        endpoint: "/external/finance/invoices",
+        method: "POST",
+        batchId: "INV-BATCH-20261027-01",
+        recordCount: 320,
+        payloadSize: "68.2 KB",
+        latency: 280,
+        status: 200,
+        statusText: "OK",
+        responsibility: "【雙方正常】中台批次拋轉電子發票開立字軌與明細，遠雄財務已成功接收並回傳 ACK。",
+        respType: "SUCCESS",
+        canRetry: false,
+        requestHeader: {
+          "Host": "finance-api.farglory.com.tw",
+          "Content-Type": "application/json",
+          "Authorization": "Bearer farglory_token_sec_99401"
+        },
+        requestBody: {
+          "batchNumber": "INV-BATCH-20261027-01",
+          "invoicePeriod": "11510",
+          "invoicesCount": 320,
+          "totalSalesAmount": 192000,
+          "totalTax": 9600
+        },
+        responseBody: {
+          "ackCode": "FG_INV_ACK_SUCCESS",
+          "receivedCount": 320,
+          "processedAt": "2026-10-27T10:30:15.930Z",
+          "status": "ACCEPTED"
+        }
+      },
+      {
+        id: "LOG-20261027-005",
+        timestamp: "2026-10-27 10:15:33.020",
+        system: "JDE",
+        systemName: "Oracle JDE ERP",
+        direction: "PULL",
+        directionLabel: "單向拉取 Pull",
+        endpoint: "/api/v1/jde/inventory-sync",
+        method: "GET",
+        batchId: "JDE-REQ-INV-TIMEOUT",
+        recordCount: 0,
+        payloadSize: "1.2 KB",
+        latency: 5004,
+        status: 504,
+        statusText: "Gateway Timeout",
+        responsibility: "【JDE 端責任】JDE 內部微服務代理在交握逾時 (5000ms)，中台保持待命，封包阻斷於 JDE 網閘側。",
+        respType: "THEIR_FAULT",
+        canRetry: true,
+        requestHeader: {
+          "Host": "middleware.fonticket.com",
+          "X-JDE-AuthKey": "jde_museum_app_token_902"
+        },
+        requestBody: {
+          "action": "GET /api/v1/jde/inventory-sync"
+        },
+        responseBody: {
+          "code": 504,
+          "error": "Gateway Timeout",
+          "message": "Upstream JDE AP Gateway failed to respond within 5000ms timeout threshold",
+          "timestamp": "2026-10-27T10:15:38.024Z"
+        }
+      },
+      {
+        id: "LOG-20261027-006",
+        timestamp: "2026-10-27 10:00:02.150",
+        system: "FARGLORY",
+        systemName: "遠雄財務系統",
+        direction: "PUSH",
+        directionLabel: "單向拋轉 Push",
+        endpoint: "/external/finance/daily-settlement",
+        method: "POST",
+        batchId: "BATCH-DOME-20261025-FINAL",
+        recordCount: 1680,
+        payloadSize: "182.1 KB",
+        latency: 540,
+        status: 200,
+        statusText: "OK",
+        responsibility: "【雙方正常】昨日帳務最終結算平帳檔拋轉成功，遠雄核章代碼：FG-20261026-APRV-OK。",
+        respType: "SUCCESS",
+        canRetry: false,
+        requestHeader: {
+          "Host": "finance-api.farglory.com.tw",
+          "Content-Type": "application/json",
+          "Authorization": "Bearer farglory_token_sec_99401"
+        },
+        requestBody: {
+          "settlementDate": "2026-10-25",
+          "facilityId": "DOME-MUSEUM-01",
+          "netAmount": 1024500,
+          "auditChecksum": "a8f9c0e44b821..."
+        },
+        responseBody: {
+          "ackCode": "FG_SETTLE_ACK_OK",
+          "auditApprovalId": "FG-20261026-APRV-OK",
+          "ledgerPostStatus": "POSTED"
+        }
+      },
+      {
+        id: "LOG-20261027-007",
+        timestamp: "2026-10-27 09:30:45.890",
+        system: "FARGLORY",
+        systemName: "遠雄財務系統",
+        direction: "PUSH",
+        directionLabel: "單向拋轉 Push",
+        endpoint: "/external/finance/refund-records",
+        method: "POST",
+        batchId: "REFUND-BATCH-20261027-01",
+        recordCount: 8,
+        payloadSize: "6.4 KB",
+        latency: 160,
+        status: 200,
+        statusText: "OK",
+        responsibility: "【雙方正常】折讓與退票明細拋轉完成，遠雄應扣帳款欄位已自動平帳扣抵。",
+        respType: "SUCCESS",
+        canRetry: false,
+        requestHeader: {
+          "Host": "finance-api.farglory.com.tw",
+          "Content-Type": "application/json"
+        },
+        requestBody: {
+          "refundDate": "2026-10-27",
+          "refundCount": 8,
+          "refundTotalAmount": 2800
+        },
+        responseBody: {
+          "status": "SUCCESS",
+          "refundBatchedId": "REFUND-ACK-99214"
+        }
+      },
+      {
+        id: "LOG-20261027-008",
+        timestamp: "2026-10-27 09:00:10.015",
+        system: "FARGLORY",
+        systemName: "遠雄財務系統",
+        direction: "PUSH",
+        directionLabel: "單向拋轉 Push",
+        endpoint: "/external/finance/audit-summary",
+        method: "POST",
+        batchId: "AUDIT-POST-99120",
+        recordCount: 1,
+        payloadSize: "2.1 KB",
+        latency: 2100,
+        status: 202,
+        statusText: "Pending ACK",
+        responsibility: "【等待遠雄確認】中台已順利投遞稽核摘要，遠雄排入非同步審計背景佇列，等待最終平帳回傳。",
+        respType: "PENDING",
+        canRetry: true,
+        requestHeader: {
+          "Host": "finance-api.farglory.com.tw",
+          "Content-Type": "application/json"
+        },
+        requestBody: {
+          "auditPeriod": "2026-10-26",
+          "type": "CASH_FLOW_VALIDATION"
+        },
+        responseBody: {
+          "status": "ACCEPTED_ASYNC",
+          "message": "Batch enqueued into Farglory Async Ledger Worker. Final ACK will be delivered via webhook."
+        }
+      },
+      {
+        id: "LOG-20261027-009",
+        timestamp: "2026-10-27 08:30:00.001",
+        system: "JDE",
+        systemName: "Oracle JDE ERP",
+        direction: "PULL",
+        directionLabel: "單向拉取 Pull",
+        endpoint: "/api/v1/jde/master-rates",
+        method: "GET",
+        batchId: "JDE-RATE-PULL-0830",
+        recordCount: 12,
+        payloadSize: "5.6 KB",
+        latency: 95,
+        status: 200,
+        statusText: "OK",
+        responsibility: "【雙方正常】JDE 例行同步展覽票種費率與會計科目對照表，95ms 完成。",
+        respType: "SUCCESS",
+        canRetry: false,
+        requestHeader: {
+          "Host": "middleware.fonticket.com",
+          "X-JDE-AuthKey": "jde_museum_app_token_902"
+        },
+        requestBody: {
+          "query": "GET /api/v1/jde/master-rates"
+        },
+        responseBody: {
+          "code": 200,
+          "rates": [
+            { "ticketId": "TKT_ADULT", "name": "全票", "price": 350, "accountCode": "4101-01" },
+            { "ticketId": "TKT_CONCESSION", "name": "優待票", "price": 250, "accountCode": "4101-02" }
+          ]
+        }
+      }
+    ];
+
+    // 全域運行態狀態
+    let logState = JSON.parse(JSON.stringify(INITIAL_LOG_DATA));
+
+    // DOM 元素引用
+    const tableBody = document.getElementById('log-table-body');
+    const emptyState = document.getElementById('empty-state');
+    const filterSystem = document.getElementById('filter-system');
+    const filterStatus = document.getElementById('filter-status');
+    const searchInput = document.getElementById('search-input');
+    const btnClearSearch = document.getElementById('btn-clear-search');
+    const btnResetFilters = document.getElementById('btn-reset-filters');
+    const btnRefresh = document.getElementById('btn-refresh');
+    const btnExportLog = document.getElementById('btn-export-log');
+    const filteredCountEl = document.getElementById('filtered-count');
+    const totalCountEl = document.getElementById('total-count');
+    const kpiFailedCountEl = document.getElementById('kpi-failed-count');
+    const kpiRetryQueueEl = document.getElementById('kpi-retry-queue');
+    const refreshIcon = document.getElementById('refresh-icon');
+
+    // Modal DOM 元素
+    const modal = document.getElementById('log-modal');
+    const modalTitleSystem = document.getElementById('modal-title-system');
+    const modalBadgeStatus = document.getElementById('modal-badge-status');
+    const modalSubtitleEndpoint = document.getElementById('modal-subtitle-endpoint');
+    const modalInfoTimestamp = document.getElementById('modal-info-timestamp');
+    const modalInfoMode = document.getElementById('modal-info-mode');
+    const modalInfoLatency = document.getElementById('modal-info-latency');
+    const modalInfoTraceId = document.getElementById('modal-info-trace-id');
+    const modalResponsibilityText = document.getElementById('modal-responsibility-text');
+    const modalRespIcon = document.getElementById('modal-resp-icon');
+    const modalResponsibilityBox = document.getElementById('modal-responsibility-box');
+    const modalReqJson = document.getElementById('modal-req-json');
+    const modalResJson = document.getElementById('modal-res-json');
+    const modalBtnClose = document.getElementById('modal-btn-close');
+    const modalBtnCloseFooter = document.getElementById('modal-btn-close-footer');
+    const modalBtnCopyAll = document.getElementById('modal-btn-copy-all');
+    let currentActiveLog = null;
+
+    /**
+     * Toast 通知管理器 (無 alert 原生彈窗)
+     */
+    function showToast(message, type = 'info', duration = 3200) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let borderClass = 'border-slate-700 bg-slate-900 text-white';
+      let iconMarkup = '<i data-lucide="info" class="w-4 h-4 text-indigo-400"></i>';
+
+      if (type === 'success') {
+        borderClass = 'border-emerald-600 bg-slate-900 text-white';
+        iconMarkup = '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>';
+      } else if (type === 'error') {
+        borderClass = 'border-red-600 bg-slate-900 text-white';
+        iconMarkup = '<i data-lucide="alert-octagon" class="w-4 h-4 text-red-400"></i>';
+      } else if (type === 'warning') {
+        borderClass = 'border-amber-600 bg-slate-900 text-white';
+        iconMarkup = '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>';
+      }
+
+      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl border ${borderClass} text-xs font-medium transition-all transform translate-y-2 opacity-0 duration-200 max-w-md`;
+      toast.innerHTML = `
+        <span class="shrink-0">${iconMarkup}</span>
+        <span class="flex-1 leading-snug">${message}</span>
+        <button class="shrink-0 text-slate-400 hover:text-white ml-2" onclick="this.parentElement.remove()">
+          <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+      `;
+
+      container.appendChild(toast);
+      lucide.createIcons({ root: toast });
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, duration);
+    }
+
+    /**
+     * 重新計算與更新頂部 KPI 數據
+     */
+    function updateKpiStats() {
+      const failedLogs = logState.filter(item => item.status >= 500);
+      kpiFailedCountEl.textContent = `${failedLogs.length} 筆`;
+
+      const retryLogs = logState.filter(item => item.status >= 500 || item.status === 202);
+      kpiRetryQueueEl.textContent = `${retryLogs.length} 筆待追蹤`;
+    }
+
+    /**
+     * 核心渲染：日誌表格過濾與顯示
+     */
+    function renderTable() {
+      const selectedSystem = filterSystem.value;
+      const selectedStatus = filterStatus.value;
+      const searchKeyword = searchInput.value.trim().toLowerCase();
+
+      // 執行即時複合式過濾
+      const filtered = logState.filter(item => {
+        // 1. 系統來源過濾
+        if (selectedSystem !== 'ALL' && item.system !== selectedSystem) {
+          return false;
+        }
+
+        // 2. 狀態碼過濾
+        if (selectedStatus === 'SUCCESS' && (item.status < 200 || item.status >= 300)) return false;
+        if (selectedStatus === 'FAILED' && item.status < 500) return false;
+        if (selectedStatus === 'BAD_REQUEST' && (item.status < 400 || item.status >= 500)) return false;
+        if (selectedStatus === 'PENDING' && item.status !== 202) return false;
+
+        // 3. 關鍵字模糊比對 (Endpoint, batchId, ID, systemName)
+        if (searchKeyword) {
+          const matchEndpoint = item.endpoint.toLowerCase().includes(searchKeyword);
+          const matchBatch = item.batchId.toLowerCase().includes(searchKeyword);
+          const matchId = item.id.toLowerCase().includes(searchKeyword);
+          const matchResp = item.responsibility.toLowerCase().includes(searchKeyword);
+          if (!matchEndpoint && !matchBatch && !matchId && !matchResp) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      // 更新統計數字
+      filteredCountEl.textContent = filtered.length;
+      totalCountEl.textContent = logState.length;
+
+      // 清空表格
+      tableBody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      // 渲染每筆日誌列
+      filtered.forEach((log) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/80 transition-colors border-b border-slate-100 group';
+
+        // 狀態 Badge 樣式
+        let statusBadge = '';
+        if (log.status === 200) {
+          statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">200 OK</span>';
+        } else if (log.status >= 500) {
+          statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-300 animate-pulse-subtle">${log.status} ${log.status === 504 ? 'Timeout' : 'Error'}</span>`;
+        } else if (log.status === 400) {
+          statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">400 Bad Req</span>';
+        } else if (log.status === 202) {
+          statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300">202 Pending</span>';
+        }
+
+        // 對接標籤
+        let systemTag = '';
+        if (log.system === 'JDE') {
+          systemTag = `
+            <div>
+              <div class="font-bold text-slate-800 font-sans flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-600 inline-block"></span>
+                Oracle JDE ERP
+              </div>
+              <div class="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200/60 rounded px-1.5 py-0.2 mt-0.5 inline-block font-sans font-medium">
+                [單向拉取 Pull]
+              </div>
+            </div>
+          `;
+        } else {
+          systemTag = `
+            <div>
+              <div class="font-bold text-slate-800 font-sans flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-600 inline-block"></span>
+                遠雄公司財務系統
+              </div>
+              <div class="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/60 rounded px-1.5 py-0.2 mt-0.5 inline-block font-sans font-medium">
+                [單向拋轉 Push]
+              </div>
+            </div>
+          `;
+        }
+
+        // Method 標籤
+        const methodBadge = log.method === 'POST' 
+          ? '<span class="bg-indigo-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">POST</span>'
+          : '<span class="bg-slate-700 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">GET</span>';
+
+        // 責任歸屬分析 Badge
+        let respBadge = '';
+        if (log.respType === 'THEIR_FAULT') {
+          respBadge = `<span class="text-red-700 font-medium font-sans bg-red-50 px-2 py-1 rounded border border-red-200/80 block max-w-xs truncate" title="${log.responsibility}">${log.responsibility}</span>`;
+        } else if (log.respType === 'PENDING') {
+          respBadge = `<span class="text-blue-700 font-medium font-sans bg-blue-50 px-2 py-1 rounded border border-blue-200/80 block max-w-xs truncate" title="${log.responsibility}">${log.responsibility}</span>`;
+        } else {
+          respBadge = `<span class="text-slate-600 font-normal font-sans bg-slate-100 px-2 py-1 rounded block max-w-xs truncate" title="${log.responsibility}">${log.responsibility}</span>`;
+        }
+
+        // 操作動作按鈕
+        let actionButtons = `
+          <div class="flex items-center justify-center gap-1.5">
+            <button 
+              class="btn-view-payload px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-md text-xs font-sans font-medium transition cursor-pointer flex items-center gap-1 border border-slate-200 shadow-2xs"
+              data-id="${log.id}"
+            >
+              <i data-lucide="eye" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>檢視 Payload</span>
+            </button>
+        `;
+
+        if (log.canRetry) {
+          actionButtons += `
+            <button 
+              class="btn-retry-push px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 rounded-md text-xs font-sans font-medium transition cursor-pointer flex items-center gap-1 border border-indigo-200 shadow-2xs"
+              data-id="${log.id}"
+              title="對該筆異常發起手動重新拋轉"
+            >
+              <i data-lucide="repeat" class="w-3.5 h-3.5"></i>
+              <span>重新拋轉</span>
+            </button>
+          `;
+        }
+        actionButtons += `</div>`;
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 whitespace-nowrap text-slate-600">
+            <div>${log.timestamp}</div>
+            <div class="text-[10px] text-slate-400 font-sans">Trace: ${log.batchId}</div>
+          </td>
+          <td class="py-3 px-4 whitespace-nowrap">${systemTag}</td>
+          <td class="py-3 px-4 whitespace-nowrap">
+            <div class="flex items-center gap-1.5">
+              ${methodBadge}
+              <span class="text-slate-800 font-bold">${log.endpoint}</span>
+            </div>
+          </td>
+          <td class="py-3 px-3 whitespace-nowrap text-right font-medium text-slate-600">
+            <div>${log.recordCount} 筆</div>
+            <div class="text-[10px] text-slate-400">${log.payloadSize}</div>
+          </td>
+          <td class="py-3 px-3 whitespace-nowrap text-right">
+            <span class="${log.latency > 2000 ? 'text-amber-600 font-bold' : 'text-slate-700'}">${log.latency} ms</span>
+          </td>
+          <td class="py-3 px-3 whitespace-nowrap text-center">${statusBadge}</td>
+          <td class="py-3 px-4 whitespace-nowrap">${respBadge}</td>
+          <td class="py-3 px-4 whitespace-nowrap text-center">${actionButtons}</td>
+        `;
+
+        tableBody.appendChild(tr);
+      });
+
+      // 重新建立圖示
+      lucide.createIcons({ root: tableBody });
+
+      // 綁定每一列按鈕事件
+      bindRowActions();
+    }
+
+    /**
+     * 綁定動態生成的每一列按鈕事件
+     */
+    function bindRowActions() {
+      // 點擊「檢視 Payload」按鈕
+      document.querySelectorAll('.btn-view-payload').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const logId = btn.getAttribute('data-id');
+          openPayloadModal(logId);
+        });
+      });
+
+      // 點擊「手動重新拋轉」按鈕
+      document.querySelectorAll('.btn-retry-push').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const logId = btn.getAttribute('data-id');
+          triggerManualRetry(logId, btn);
+        });
+      });
+    }
+
+    /**
+     * 開啟 Modal 檢視詳細 Payload 內容
+     */
+    function openPayloadModal(logId) {
+      const log = logState.find(item => item.id === logId);
+      if (!log) return;
+      currentActiveLog = log;
+
+      modalTitleSystem.textContent = `${log.systemName} API 通訊日誌細節`;
+      modalSubtitleEndpoint.textContent = `${log.method} ${log.endpoint}`;
+      
+      // 狀態 Badge 呈現
+      if (log.status === 200) {
+        modalBadgeStatus.className = "text-xs font-mono px-2 py-0.5 rounded font-bold bg-emerald-500 text-white";
+        modalBadgeStatus.textContent = "200 OK";
+      } else if (log.status >= 500) {
+        modalBadgeStatus.className = "text-xs font-mono px-2 py-0.5 rounded font-bold bg-red-600 text-white";
+        modalBadgeStatus.textContent = `${log.status} ${log.statusText}`;
+      } else {
+        modalBadgeStatus.className = "text-xs font-mono px-2 py-0.5 rounded font-bold bg-amber-500 text-white";
+        modalBadgeStatus.textContent = `${log.status} ${log.statusText}`;
+      }
+
+      modalInfoTimestamp.textContent = log.timestamp;
+      modalInfoMode.textContent = log.directionLabel;
+      modalInfoLatency.textContent = `${log.latency} ms (${log.payloadSize})`;
+      modalInfoTraceId.textContent = log.batchId;
+
+      // 責任判定區塊
+      modalResponsibilityText.textContent = log.responsibility;
+      if (log.respType === 'THEIR_FAULT') {
+        modalResponsibilityBox.className = "p-3 rounded-lg border flex items-start gap-2.5 text-xs font-sans bg-red-50 border-red-200 text-red-900";
+      } else if (log.respType === 'PENDING') {
+        modalResponsibilityBox.className = "p-3 rounded-lg border flex items-start gap-2.5 text-xs font-sans bg-blue-50 border-blue-200 text-blue-900";
+      } else {
+        modalResponsibilityBox.className = "p-3 rounded-lg border flex items-start gap-2.5 text-xs font-sans bg-emerald-50 border-emerald-200 text-emerald-900";
+      }
+
+      // JSON 格式化渲染
+      const reqCombined = {
+        headers: log.requestHeader,
+        body: log.requestBody
+      };
+      modalReqJson.textContent = JSON.stringify(reqCombined, null, 2);
+      modalResJson.textContent = JSON.stringify(log.responseBody, null, 2);
+
+      // 顯示 Modal
+      modal.classList.remove('hidden');
+      lucide.createIcons({ root: modal });
+    }
+
+    /**
+     * 關閉 Modal
+     */
+    function closeModal() {
+      modal.classList.add('hidden');
+      currentActiveLog = null;
+    }
+
+    modalBtnClose.addEventListener('click', closeModal);
+    modalBtnCloseFooter.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    /**
+     * 複製 JSON 代碼功能
+     */
+    document.querySelectorAll('.btn-copy-code').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        const text = document.getElementById(targetId).textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('JSON 封包內容已成功複製至剪貼簿！', 'success');
+        });
+      });
+    });
+
+    /**
+     * 複製完整 Log 摘要
+     */
+    modalBtnCopyAll.addEventListener('click', () => {
+      if (!currentActiveLog) return;
+      const summaryText = `[API 存證記錄 ${currentActiveLog.id}]
+時間戳記: ${currentActiveLog.timestamp}
+對接系統: ${currentActiveLog.systemName} (${currentActiveLog.directionLabel})
+端點: ${currentActiveLog.method} ${currentActiveLog.endpoint}
+狀態碼: ${currentActiveLog.status} ${currentActiveLog.statusText}
+延遲: ${currentActiveLog.latency} ms
+責任歸屬判定: ${currentActiveLog.responsibility}
+Trace/Batch ID: ${currentActiveLog.batchId}
+`;
+      navigator.clipboard.writeText(summaryText).then(() => {
+        showToast('已複製完整責任稽核摘要文本！', 'success');
+      });
+    });
+
+    /**
+     * 手動重新拋轉模擬 (Retry Mechanism)
+     */
+    function triggerManualRetry(logId, buttonEl) {
+      const log = logState.find(item => item.id === logId);
+      if (!log) return;
+
+      // 按鈕旋轉中狀態
+      const originalHtml = buttonEl.innerHTML;
+      buttonEl.disabled = true;
+      buttonEl.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>拋轉中...</span>';
+      lucide.createIcons({ root: buttonEl });
+
+      showToast(`正在重新對【${log.systemName}】下發端點 ${log.endpoint}...`, 'info', 2000);
+
+      // 模擬非同步連線 1.2 秒後成功
+      setTimeout(() => {
+        log.status = 200;
+        log.statusText = "OK (Retried)";
+        log.latency = 245;
+        log.canRetry = false;
+        log.respType = "SUCCESS";
+        log.responsibility = "【重拋平帳成功】由中台維運經辦發起手動重新拋轉，遠雄端已成功接收並寫入主會計流水帳。";
+        log.timestamp = new Date().toISOString().replace('T', ' ').substring(0, 23);
+        log.responseBody = {
+          "status": 200,
+          "ackCode": "MANUAL_RETRY_SUCCESS_200",
+          "reprocessedAt": log.timestamp,
+          "message": "Transaction verified and successfully accepted into General Ledger."
+        };
+
+        // 更新 KPI 與表格
+        updateKpiStats();
+        renderTable();
+
+        showToast(`【重拋成功】Log ID ${log.id} 已完成補拋，狀態已更動為 200 OK！`, 'success', 4000);
+      }, 1200);
+    }
+
+    /**
+     * 一鍵匯出 Audit Log CSV
+     */
+    btnExportLog.addEventListener('click', () => {
+      // 構建 CSV 內容
+      const headers = ["Log ID", "時間戳記", "對接系統", "傳輸方向", "Endpoint", "Method", "Batch/Trace ID", "筆數", "Payload大小", "延遲(ms)", "HTTP狀態碼", "責任歸屬判定"];
+      const rows = logState.map(log => [
+        `"${log.id}"`,
+        `"${log.timestamp}"`,
+        `"${log.systemName}"`,
+        `"${log.directionLabel}"`,
+        `"${log.endpoint}"`,
+        `"${log.method}"`,
+        `"${log.batchId}"`,
+        log.recordCount,
+        `"${log.payloadSize}"`,
+        log.latency,
+        log.status,
+        `"${log.responsibility.replace(/"/g, '""')}"`
+      ]);
+
+      const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FonTicket_API_Audit_Log_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast('成功匯出完整 Audit Log 稽核清單 (CSV)！', 'success');
+    });
+
+    /**
+     * 即時重整 (Refresh)
+     */
+    btnRefresh.addEventListener('click', () => {
+      refreshIcon.classList.add('animate-spin');
+      showToast('正在與 API Gateway 同步最新連線監控狀態...', 'info', 1200);
+      setTimeout(() => {
+        refreshIcon.classList.remove('animate-spin');
+        renderTable();
+        showToast('已更新至最新通訊日誌數據！', 'success');
+      }, 800);
+    });
+
+    /**
+     * 篩選器事件監聽
+     */
+    filterSystem.addEventListener('change', renderTable);
+    filterStatus.addEventListener('change', renderTable);
+    searchInput.addEventListener('input', () => {
+      if (searchInput.value.trim().length > 0) {
+        btnClearSearch.classList.remove('hidden');
+      } else {
+        btnClearSearch.classList.add('hidden');
+      }
+      renderTable();
+    });
+
+    btnClearSearch.addEventListener('click', () => {
+      searchInput.value = '';
+      btnClearSearch.classList.add('hidden');
+      renderTable();
+    });
+
+    btnResetFilters.addEventListener('click', () => {
+      filterSystem.value = 'ALL';
+      filterStatus.value = 'ALL';
+      searchInput.value = '';
+      btnClearSearch.classList.add('hidden');
+      renderTable();
+      showToast('已重設所有搜尋與篩選條件', 'info');
+    });
+
+    // 鍵盤快捷鍵：ESC 關閉彈窗
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+        closeModal();
+      }
+    });
+
+    // 初始化應用程式
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      updateKpiStats();
+      renderTable();
+    });
+  </script>
+</body>
+</html>
